@@ -1,0 +1,42 @@
+# Crypto Futures Bot — Docker образ
+FROM python:3.11-slim
+
+# Метаданные
+LABEL maintainer="trading-bots"
+LABEL description="Crypto Futures Bot (Binance Funding Rate Arbitrage)"
+
+# Системные зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Рабочая директория
+WORKDIR /app
+
+# Зависимости (кешируются отдельным слоем)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Код проекта
+COPY core/ ./core/
+COPY bots/crypto_futures/ ./bots/crypto_futures/
+COPY bots/__init__.py ./bots/
+COPY config/crypto.yaml ./config/
+COPY .env.example ./.env.example
+
+# Директории для данных
+RUN mkdir -p /app/logs /app/keys
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Непривилегированный пользователь
+RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+USER botuser
+
+# Порт FastAPI
+EXPOSE 8080
+
+# Точка входа
+CMD ["python", "-m", "bots.crypto_futures.main"]

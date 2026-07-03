@@ -1,0 +1,95 @@
+version: "3.9"
+
+# ============================================================
+# Trading Bots — Docker Compose
+# Запуск: docker-compose up -d
+# Только крипто: docker-compose up -d crypto-bot
+# Логи: docker-compose logs -f crypto-bot
+# ============================================================
+
+services:
+
+  # ── Crypto Futures Bot ─────────────────────────────────────
+  crypto-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.crypto
+    container_name: crypto_futures_bot
+    restart: unless-stopped       # автоподъём при падении
+
+    env_file:
+      - .env                      # основные секреты
+
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/crypto.db
+
+    volumes:
+      - crypto_data:/app/data     # база данных
+      - crypto_logs:/app/logs     # логи
+      - ./keys:/app/keys:ro       # API ключи (read-only)
+      - ./config/crypto.yaml:/app/config/crypto.yaml:ro
+
+    ports:
+      - "8080:8080"               # FastAPI health/status
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Kalshi Bot ─────────────────────────────────────────────
+  kalshi-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.kalshi
+    container_name: kalshi_bot
+    restart: unless-stopped
+    profiles:
+      - kalshi                    # запускается только с: docker-compose --profile kalshi up
+
+    env_file:
+      - .env
+
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/kalshi.db
+
+    volumes:
+      - kalshi_data:/app/data
+      - kalshi_logs:/app/logs
+      - ./keys:/app/keys:ro
+      - ./config/kalshi.yaml:/app/config/kalshi.yaml:ro
+
+    ports:
+      - "8081:8081"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+# ── Volumes ────────────────────────────────────────────────────
+volumes:
+  crypto_data:
+    driver: local
+  crypto_logs:
+    driver: local
+  kalshi_data:
+    driver: local
+  kalshi_logs:
+    driver: local

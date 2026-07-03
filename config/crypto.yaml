@@ -1,0 +1,42 @@
+# Crypto Futures Bot — параметры стратегий и риск-лимиты
+# Параметры funding_rate взяты из симулятора (оптимум из sensitivity analysis)
+
+risk:
+  daily_loss_limit_pct: 5.0        # % дневного убытка → circuit breaker
+  max_leverage: 2                   # максимальное плечо (НЕ МЕНЯТЬ без анализа!)
+  max_position_size_usd: 500        # максимальный размер позиции в $
+  max_total_exposure_pct: 30.0      # % капитала в открытых позициях
+
+strategies:
+  funding_rate:
+    enabled: true
+    symbols:
+      - BTCUSDT
+      - ETHUSDT
+    stop_threshold: 0.00002         # 0.002%/8h — выходим если funding ниже
+    stop_consec: 3                  # сколько подряд плохих периодов до выхода
+    reentry_threshold: 0.00005      # 0.005%/8h — входим если funding выше
+    reentry_consec: 3               # сколько подряд хороших периодов до входа
+    capital_per_symbol_pct: 20      # % капитала на каждый символ
+
+  trend_following:
+    enabled: false                  # включить после валидации Funding Rate Bot
+    symbols:
+      - BTCUSDT
+    ema_fast: 9
+    ema_slow: 21
+    adx_threshold: 25               # торгуем только если ADX > 25 (тренд есть)
+    leverage: 2
+    stop_loss_pct: 3.0
+    take_profit_pct: 6.0
+
+  grid_bot:
+    enabled: false                  # включить только при ADX < 20 (боковик)
+    symbol: BTCUSDT
+    grid_levels: 10
+    range_pct: 5.0                  # ширина сетки ± 5% от текущей цены
+    order_size_usd: 50
+
+exchanges:
+  primary: binance
+  backup: bybit                     # резервная, если Binance недоступен

@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚡ Trading Terminal</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────────────────── */
+    :root[data-theme="dark"] {
+      --bg-primary:     #070c18;
+      --bg-panel:       #0d1526;
+      --bg-panel-hdr:   #111e36;
+      --border:         #1a2d4a;
+      --border-bright:  #243d62;
+      --text-primary:   #e2e8f0;
+      --text-secondary: #546e8a;
+      --text-muted:     #253040;
+      --accent-green:   #00d4aa;
+      --accent-red:     #ff4757;
+      --accent-blue:    #3b9eff;
+      --accent-yellow:  #f59e0b;
+      --accent-purple:  #a855f7;
+      --glow-green:     0 0 12px rgba(0,212,170,.35);
+      --glow-red:       0 0 12px rgba(255,71,87,.35);
+      --scrollbar-bg:   #0d1526;
+      --scrollbar-th:   #1a2d4a;
+    }
+    :root[data-theme="light"] {
+      --bg-primary:     #f0f4f8;
+      --bg-panel:       #ffffff;
+      --bg-panel-hdr:   #e8edf5;
+      --border:         #d1dce8;
+      --border-bright:  #b8c8da;
+      --text-primary:   #1e293b;
+      --text-secondary: #475569;
+      --text-muted:     #94a3b8;
+      --accent-green:   #059669;
+      --accent-red:     #dc2626;
+      --accent-blue:    #2563eb;
+      --accent-yellow:  #d97706;
+      --accent-purple:  #7c3aed;
+      --glow-green:     none;
+      --glow-red:       none;
+      --scrollbar-bg:   #f0f4f8;
+      --scrollbar-th:   #d1dce8;
+    }
+
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-th); border-radius: 3px; }
+
+    /* ── Top Bar ───────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 6px 14px;
+      background: var(--bg-panel-hdr);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      user-select: none;
+    }
+    .topbar-logo {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--accent-blue);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .topbar-sep { color: var(--border-bright); }
+    .topbar-clock {
+      color: var(--accent-green);
+      font-size: 13px;
+      font-weight: bold;
+      min-width: 80px;
+      text-shadow: var(--glow-green);
+    }
+    .topbar-tickers {
+      display: flex;
+      gap: 18px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .topbar-tick {
+      display: flex;
+      gap: 5px;
+      align-items: baseline;
+      white-space: nowrap;
+    }
+    .topbar-tick .sym { color: var(--accent-blue); font-size: 11px; }
+    .topbar-tick .px  { color: var(--text-primary); font-size: 12px; }
+    .topbar-badge {
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .badge-demo { background: var(--accent-yellow); color: #000; }
+    .badge-live { background: var(--accent-green); color: #000; }
+    .topbar-shortcuts {
+      color: var(--text-secondary);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .topbar-btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 3px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      transition: border-color .15s;
+    }
+    .topbar-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    /* ── Grid Layout ───────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    }
+    .panel-wide { grid-column: 1 / -1; }
+
+    /* ── Panel ─────────────────────────────────────────────────────────── */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-header {
+      background: var(--bg-panel-hdr);
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .panel-title {
+      color: var(--text-secondary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .panel-meta { color: var(--text-secondary); font-size: 10px; }
+    .panel-body { padding: 12px; flex: 1; }
+    .panel-body-nop { flex: 1; }
+
+    /* ── Price Display ─────────────────────────────────────────────────── */
+    .price-main {
+      font-size: 30px;
+      font-weight: bold;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+    .up   { color: var(--accent-green); }
+    .down { color: var(--accent-red); }
+    .neutral { color: var(--text-secondary); }
+
+    /* ── Metrics Grid ──────────────────────────────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .metric-item label {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .metric-val {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    /* ── Watchlist ─────────────────────────────────────────────────────── */
+    .watchlist {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .watchlist th {
+      color: var(--text-secondary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      font-weight: normal;
+    }
+    .watchlist th:first-child { text-align: left; }
+    .watchlist td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--text-muted);
+      text-align: right;
+      font-size: 12px;
+    }
+    .watchlist td:first-child { text-align: left; color: var(--accent-blue); font-weight: bold; }
+    .watchlist tr:last-child td { border-bottom: none; }
+    .watchlist tr:hover td { background: var(--bg-panel-hdr); }
+
+    /* ── Bars ──────────────────────────────────────────────────────────── */
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+    .bar-label { width: 90px; color: var(--text-secondary); font-size: 10px; white-space: nowrap; }
+    .bar-track {
+      flex: 1;
+      background: var(--text-muted);
+      border-radius: 3px;
+      height: 7px;
+      overflow: hidden;
+    }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+    .bar-pct { width: 35px; text-align: right; color: var(--text-primary); font-size: 11px; }
+
+    /* ── Order Book ────────────────────────────────────────────────────── */
+    .book-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .book-col h4 {
+      font-size: 10px;
+      font-weight: normal;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .book-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 11px;
+      border-bottom: 1px solid var(--text-muted);
+      position: relative;
+    }
+    .book-bar {
+      position: absolute;
+      top: 0; bottom: 0;
+      opacity: .12;
+    }
+    .book-bar-bid { right: 0; background: var(--accent-green); }
+    .book-bar-ask { left: 0; background: var(--accent-red); }
+    .book-price { position: relative; z-index: 1; }
+    .book-size  { position: relative; z-index: 1; color: var(--text-secondary); }
+
+    /* ── P&L ───────────────────────────────────────────────────────────── */
+    .pnl-stat-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 10px;
+    }
+    .pnl-stat label { color: var(--text-secondary); font-size: 10px; display: block; margin-bottom: 2px; }
+    .pnl-stat .val  { font-size: 18px; font-weight: bold; }
+
+    /* ── Regime Badge ──────────────────────────────────────────────────── */
+    .regime-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 3px;
+      font-size: 15px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .regime-bull     { background: rgba(0,212,170,.12); color: var(--accent-green); }
+    .regime-bear     { background: rgba(255,71,87,.12);  color: var(--accent-red); }
+    .regime-range    { background: rgba(245,158,11,.12); color: var(--accent-yellow); }
+    .regime-volatile { background: rgba(59,158,255,.12); color: var(--accent-blue); }
+
+    /* ── Command Palette ───────────────────────────────────────────────── */
+    .cmd-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.72);
+      z-index: 999;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 80px;
+      backdrop-filter: blur(2px);
+    }
+    .cmd-overlay.open { display: flex; }
+    .cmd-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      width: 580px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.6);
+      overflow: hidden;
+    }
+    .cmd-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 15px;
+      padding: 16px 18px;
+      font-family: inherit;
+      border-bottom: 1px solid var(--border);
+    }
+    .cmd-item {
+      padding: 10px 18px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background .1s;
+    }
+    .cmd-item:hover, .cmd-item.active { background: var(--bg-panel-hdr); }
+    .cmd-item-label { color: var(--text-primary); }
+    .cmd-item-key   { color: var(--text-secondary); font-size: 10px; }
+    .cmd-section {
+      padding: 6px 18px 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--text-muted);
+      margin-top: 4px;
+    }
+    .cmd-empty {
+      padding: 16px 18px;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Bar ─────────────────────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="topbar-logo">⚡ TERMINAL</div>
+  <span class="topbar-sep">|</span>
+  <div class="topbar-clock" id="clock">--:--:--</div>
+  <span class="topbar-sep">|</span>
+  <div class="topbar-tickers" id="topbar-tickers"></div>
+  <span id="mode-badge" class="topbar-badge badge-demo">DEMO</span>
+  <div class="topbar-shortcuts">T=Theme &nbsp;|&nbsp; R=Refresh &nbsp;|&nbsp; ⌘K=Cmd</div>
+  <button class="topbar-btn" onclick="openCmdPalette()">⌘ Commands</button>
+  <button class="topbar-btn" onclick="toggleTheme()">◑ Theme</button>
+</div>
+
+<!-- ── Dashboard Grid ──────────────────────────────────────────────────── -->
+<div class="grid" id="grid"></div>
+
+<!-- ── Command Palette ─────────────────────────────────────────────────── -->
+<div class="cmd-overlay" id="cmd-overlay" onclick="overlayClick(event)">
+  <div class="cmd-box">
+    <input
+      class="cmd-input"
+      id="cmd-input"
+      placeholder="Search commands…"
+      autocomplete="off"
+      oninput="renderCmdList(this.value)"
+      onkeydown="handleCmdNav(event)"
+    >
+    <div id="cmd-list"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME
+═══════════════════════════════════════════════════════════════════════════ */
+let theme = localStorage.getItem('trm_theme') || 'dark';
+document.documentElement.setAttribute('data-theme', theme);
+
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('trm_theme', theme);
+  // Re-render charts (colours change)
+  renderDashboard();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════════════════════════════════ */
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US', { hour12: false });
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEMO DATA GENERATORS
+═══════════════════════════════════════════════════════════════════════════ */
+function seed(s) { /* simple LCG for reproducible "random" */ let v=s; return ()=>{ v=(v*1664525+1013904223)&0xFFFFFFFF; return (v>>>0)/0xFFFFFFFF; }; }
+
+function genPrices(n, start, vol, rng) {
+  rng = rng || Math.random;
+  const arr = [+start.toFixed(start > 100 ? 2 : 4)];
+  for (let i = 1; i < n; i++) {
+    const ret = (rng() - 0.49) * vol;
+    arr.push(+(arr[i-1] * (1 + ret)).toFixed(start > 100 ? 2 : 4));
+  }
+  return arr;
+}
+
+function genLabels(n, intervalMin=5) {
+  const base = new Date(); base.setMinutes(base.getMinutes() - n*intervalMin);
+  return Array.from({length:n}, (_,i) => {
+    const d = new Date(base.getTime() + i*intervalMin*60000);
+    return d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
+  });
+}
+
+const WATCHLIST = [
+  { sym:'SPY',     price:547.38, chg:+2.41, pct:+0.44 },
+  { sym:'QQQ',     price:471.92, chg:-1.87, pct:-0.39 },
+  { sym:'AAPL',    price:217.63, chg:+3.28, pct:+1.53 },
+  { sym:'NVDA',    price:136.04, chg:+4.12, pct:+3.12 },
+  { sym:'TSLA',    price:252.17, chg:-5.43, pct:-2.11 },
+  { sym:'META',    price:548.92, chg:+8.75, pct:+1.62 },
+  { sym:'BTC-USD', price:68420,  chg:+1360, pct:+2.03 },
+  { sym:'ETH-USD', price:3724,   chg:-48,   pct:-1.27 },
+  { sym:'EUR/USD', price:1.0841, chg:+0.0015,pct:+0.14},
+  { sym:'GC=F',   price:2398.4, chg:-6.2,  pct:-0.26 },
+];
+
+const RISK = {
+  var95: '-1.74%', cvar95: '-2.38%',
+  sharpe: '1.42',  sortino: '1.87',
+  maxDD: '-7.93%', beta: '0.84',
+  calmar: '2.11',  winRate: '58.3%',
+  avgWin: '+1.82%',avgLoss: '-0.94%',
+  profitFactor: '1.91', expectancy: '+0.61%',
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHART HELPERS
+═══════════════════════════════════════════════════════════════════════════ */
+const CHARTS = {};
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function mkChart(id, labels, data, color, type='line') {
+  const existing = CHARTS[id];
+  if (existing) { existing.destroy(); delete CHARTS[id]; }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  CHARTS[id] = new Chart(ctx, {
+    type,
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: color,
+        borderWidth: type==='line' ? 1.5 : 0,
+        backgroundColor: type==='line'
+          ? color.replace('rgb','rgba').replace(')',',0.08)')
+          : data.map(v => v >= 0 ? cssVar('--accent-green').trim() : cssVar('--accent-red').trim()),
+        fill: type==='line',
+        tension: 0.25,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ' ' + ctx.parsed.y.toLocaleString() }
+      }},
+      scales: {
+        x: {
+          display: false,
+          ticks: { maxTicksLimit: 6, color: cssVar('--text-secondary'), font: {size:9, family:'Courier New'} }
+        },
+        y: { display: false }
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANEL BUILDERS
+═══════════════════════════════════════════════════════════════════════════ */
+
+// ── Price Chart Panel ──────────────────────────────────────────────────────
+function panelPrice(sym, prices, labels) {
+  const last = prices[prices.length-1], first = prices[0];
+  const chg = last - first, pct = (chg/first*100).toFixed(2);
+  const cls = chg >= 0 ? 'up' : 'down';
+  const sign = chg >= 0 ? '+' : '';
+  const canvasId = 'c_' + sym.replace(/[^\w]/g,'_');
+  setTimeout(() => {
+    const color = chg >= 0
+      ? 'rgb(0,212,170)'
+      : 'rgb(255,71,87)';
+    mkChart(canvasId, labels, prices, color);
+  }, 30);
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">${sym} &nbsp;·&nbsp; 5-min</span>
+        <span class="${cls}" style="font-size:11px">${sign}${pct}%</span>
+      </div>
+      <div class="panel-body">
+        <div class="price-row">
+          <span class="price-main">${last.toLocaleString(undefined,{minimumFractionDigits: last<10?4:2, maximumFractionDigits:last<10?4:2})}</span>
+          <span class="${cls}" style="font-size:13px">${sign}${chg.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        </div>
+        <canvas id="${canvasId}" height="90"></canvas>
+      </div>
+    </div>`;
+}
+
+// ── P&L Curve Panel ────────────────────────────────────────────────────────
+function panelPnL(pnlArr, labels) {
+  const canvasId = 'c_pnl';
+  const today = pnlArr[pnlArr.length-1];
+  const maxDD  = -7.93;
+  const allTime = +28.41;
+  setTimeout(() => {
+    const color = today >= 0 ? 'rgb(0,212,170)' : 'rgb(255,71,87)';
+    mkChart(canvasId, labels, pnlArr, color);
+  }, 30);
+  const cls = today >= 0 ? 'up' : 'down';
+  const sign = today >= 0 ? '+' : '';
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Strategy P&amp;L — YTD</span>
+        <span class="${cls}" style="font-size:11px">${sign}${today.toFixed(2)}%</span>
+      </div>
+      <div class="panel-body">
+        <div class="pnl-stat-row">
+          <div class="pnl-stat"><label>Today</label><span class="val ${cls}">${sign}${today.toFixed(2)}%</span></div>
+          <div class="pnl-stat"><label>Max DD</label><span class="val down">${maxDD}%</span></div>
+          <div class="pnl-stat"><label>All-Time</label><span class="val up">+${allTime}%</span></div>
+        </div>
+        <canvas id="${canvasId}" height="90"></canvas>
+      </div>
+    </div>`;
+}
+
+// ── Risk Metrics Panel ─────────────────────────────────────────────────────
+function panelRisk() {
+  const r = RISK;
+  const items = [
+    ['VaR 95%',        r.var95,         'down'],
+    ['CVaR 95%',       r.cvar95,        'down'],
+    ['Sharpe',         r.sharpe,        'up'],
+    ['Sortino',        r.sortino,       'up'],
+    ['Max Drawdown',   r.maxDD,         'down'],
+    ['Beta',           r.beta,          'neutral'],
+    ['Calmar',         r.calmar,        'up'],
+    ['Win Rate',       r.winRate,       'up'],
+    ['Avg Win',        r.avgWin,        'up'],
+    ['Avg Loss',       r.avgLoss,       'down'],
+    ['Profit Factor',  r.profitFactor,  'up'],
+    ['Expectancy',     r.expectancy,    'up'],
+  ];
+  const html = items.map(([label,val,cls]) => `
+    <div class="metric-item">
+      <label>${label}</label>
+      <div class="metric-val ${cls}">${val}</div>
+    </div>`).join('');
+  return `
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Risk Metrics</span><span class="panel-meta">live calc</span></div>
+      <div class="panel-body"><div class="metrics-grid">${html}</div></div>
+    </div>`;
+}
+
+// ── Watchlist Panel ────────────────────────────────────────────────────────
+function panelWatchlist() {
+  const rows = WATCHLIST.map(s => {
+    const cls = s.chg >= 0 ? 'up' : 'down';
+    const sign = s.chg >= 0 ? '+' : '';
+    const priceStr = s.price < 10
+      ? s.price.toFixed(4)
+      : s.price.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    const chgStr   = Math.abs(s.chg) < 0.01 ? s.chg.toFixed(4) : s.chg.toFixed(2);
+    return `<tr>
+      <td>${s.sym}</td>
+      <td>${priceStr}</td>
+      <td class="${cls}">${sign}${chgStr}</td>
+      <td class="${cls}">${sign}${s.pct.toFixed(2)}%</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Watchlist</span><span class="panel-meta">10 symbols</span></div>
+      <div class="panel-body-nop">
+        <table class="watchlist">
+          <thead><tr><th>Symbol</th><th>Last</th><th>Chg</th><th>%</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── Market Regime Panel ────────────────────────────────────────────────────
+function panelRegime() {
+  const regimes = [
+    { label:'BULL TREND', cls:'regime-bull',     bar:'var(--accent-green)',  conf:76 },
+    { label:'RANGING',    cls:'regime-range',    bar:'var(--accent-yellow)', conf:15 },
+    { label:'BEAR TREND', cls:'regime-bear',     bar:'var(--accent-red)',    conf:6  },
+    { label:'HIGH VOL',   cls:'regime-volatile', bar:'var(--accent-blue)',   conf:3  },
+  ];
+  const top = regimes[0];
+  const indicators = [
+    ['Trend Strength', '72 / 100',    'up'],
+    ['Momentum',       '+0.83 σ',     'up'],
+    ['Volatility',     '14.2% (VIX)', 'neutral'],
+    ['Breadth',        '68% stocks ↑','up'],
+  ];
+  const bars = regimes.map(r => `
+    <div class="bar-row">
+      <span class="bar-label">${r.label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${r.conf}%;background:${r.bar}"></div></div>
+      <span class="bar-pct">${r.conf}%</span>
+    </div>`).join('');
+  const indRows = indicators.map(([l,v,c]) => `
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--text-muted)">
+      <span style="color:var(--text-secondary);font-size:10px">${l}</span>
+      <span class="${c}">${v}</span>
+    </div>`).join('');
+  return `
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Market Regime &nbsp;·&nbsp; HMM</span></div>
+      <div class="panel-body">
+        <div style="margin-bottom:14px">
+          <span class="regime-badge ${top.cls}">${top.label}</span>
+          <span style="margin-left:10px;color:var(--text-secondary);font-size:11px">Confidence: ${top.conf}%</span>
+        </div>
+        ${bars}
+        <div style="margin-top:14px">${indRows}</div>
+      </div>
+    </div>`;
+}
+
+// ── Order Book Panel ───────────────────────────────────────────────────────
+function panelOrderBook(sym, midPrice) {
+  const rng = seed(42);
+  const bids = Array.from({length:8}, (_,i) => ({
+    price: +(midPrice - (i+1)*0.25).toFixed(2),
+    size:  +(rng()*120+10).toFixed(0),
+  }));
+  const asks = Array.from({length:8}, (_,i) => ({
+    price: +(midPrice + (i+1)*0.25).toFixed(2),
+    size:  +(rng()*120+10).toFixed(0),
+  }));
+  const maxBid = Math.max(...bids.map(b=>b.size));
+  const maxAsk = Math.max(...asks.map(a=>a.size));
+  const bidRows = bids.map(b => `
+    <div class="book-row">
+      <div class="book-bar book-bar-bid" style="width:${(b.size/maxBid*100).toFixed(0)}%"></div>
+      <span class="book-price up">${b.price.toFixed(2)}</span>
+      <span class="book-size">${b.size}</span>
+    </div>`).join('');
+  const askRows = asks.map(a => `
+    <div class="book-row">
+      <div class="book-bar book-bar-ask" style="width:${(a.size/maxAsk*100).toFixed(0)}%"></div>
+      <span class="book-price down">${a.price.toFixed(2)}</span>
+      <span class="book-size">${a.size}</span>
+    </div>`).join('');
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Order Book — ${sym}</span>
+        <span class="panel-meta">Spread: $0.25</span>
+      </div>
+      <div class="panel-body">
+        <div class="book-grid">
+          <div class="book-col"><h4 style="color:var(--accent-green)">Bids</h4>${bidRows}</div>
+          <div class="book-col"><h4 style="color:var(--accent-red)">Asks</h4>${askRows}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Daily Returns Histogram ────────────────────────────────────────────────
+function panelHistogram() {
+  const rng = seed(99);
+  const rets = Array.from({length:60}, () => +(rng()-0.48)*4);
+  const bins = Array.from({length:20}, (_,i) => -5 + i*0.5);
+  const counts = bins.map(b => rets.filter(r => r >= b && r < b+0.5).length);
+  const canvasId = 'c_hist';
+  setTimeout(() => {
+    mkChart(canvasId, bins.map(b=>(b>=0?'+':'')+b.toFixed(1)+'%'), counts, 'rgb(59,158,255)', 'bar');
+  }, 30);
+  return `
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Daily Returns Distribution</span><span class="panel-meta">60 sessions</span></div>
+      <div class="panel-body">
+        <canvas id="${canvasId}" height="100"></canvas>
+        <div style="display:flex;gap:18px;margin-top:8px">
+          <div><label style="color:var(--text-secondary);font-size:10px">Mean</label><br><span class="up">+0.24%</span></div>
+          <div><label style="color:var(--text-secondary);font-size:10px">Std Dev</label><br><span class="neutral">1.12%</span></div>
+          <div><label style="color:var(--text-secondary);font-size:10px">Skew</label><br><span class="up">+0.31</span></div>
+          <div><label style="color:var(--text-secondary);font-size:10px">Kurtosis</label><br><span class="neutral">0.88</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TICKER BAR
+═══════════════════════════════════════════════════════════════════════════ */
+function renderTickerBar() {
+  const items = WATCHLIST.slice(0,6).map(s => {
+    const cls = s.chg >= 0 ? 'up' : 'down';
+    const sign = s.chg >= 0 ? '+' : '';
+    return `<div class="topbar-tick">
+      <span class="sym">${s.sym}</span>
+      <span class="px">${s.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      <span class="${cls}" style="font-size:11px">${sign}${s.pct.toFixed(2)}%</span>
+    </div>`;
+  }).join('');
+  document.getElementById('topbar-tickers').innerHTML = items;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN RENDER
+═══════════════════════════════════════════════════════════════════════════ */
+function renderDashboard() {
+  Object.values(CHARTS).forEach(c => c.destroy());
+  Object.keys(CHARTS).forEach(k => delete CHARTS[k]);
+
+  const rng1 = seed(7);
+  const rng2 = seed(13);
+  const rng3 = seed(21);
+
+  const spyPrices = genPrices(78, 545.2, 0.0045, rng1);
+  const btcPrices = genPrices(78, 67200, 0.011,  rng2);
+  const labels    = genLabels(78, 5);
+
+  // P&L curve: cumulative daily returns
+  const pnlRng = seed(55);
+  const dailyRets = Array.from({length:130}, () => (pnlRng()-0.46)*1.8);
+  let cum = 0;
+  const pnlArr = dailyRets.map(r => +(cum += r, cum).toFixed(2));
+  const pnlLabels = Array.from({length:130}, (_,i)=>`D${i+1}`);
+
+  document.getElementById('grid').innerHTML =
+    panelPrice('SPY', spyPrices, labels) +
+    panelPrice('BTC/USD', btcPrices, labels) +
+    panelPnL(pnlArr, pnlLabels) +
+    panelRegime() +
+    panelRisk() +
+    panelWatchlist() +
+    panelOrderBook('SPY', 547.25) +
+    panelHistogram();
+
+  renderTickerBar();
+}
+
+renderDashboard();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE
+═══════════════════════════════════════════════════════════════════════════ */
+let currentMode = 'demo';
+function setMode(m) {
+  currentMode = m;
+  const badge = document.getElementById('mode-badge');
+  badge.textContent = m.toUpperCase();
+  badge.className = 'topbar-badge ' + (m === 'demo' ? 'badge-demo' : 'badge-live');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CSV EXPORT
+═══════════════════════════════════════════════════════════════════════════ */
+function exportCSV() {
+  const rows = [['Symbol','Price','Change','Change%']].concat(
+    WATCHLIST.map(s => [s.sym, s.price, s.chg, s.pct+'%'])
+  );
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `trading-watchlist-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMMAND PALETTE
+═══════════════════════════════════════════════════════════════════════════ */
+const COMMANDS = [
+  { group:'View',   label:'Toggle Theme',           key:'T',  fn: toggleTheme },
+  { group:'View',   label:'Refresh Dashboard',       key:'R',  fn: renderDashboard },
+  { group:'Mode',   label:'Switch to Demo Mode',     key:'D',  fn: ()=>setMode('demo') },
+  { group:'Mode',   label:'Switch to Live Mode',     key:'L',  fn: ()=>setMode('live') },
+  { group:'Export', label:'Export Watchlist CSV',    key:'',   fn: exportCSV },
+  { group:'Export', label:'Print Dashboard',         key:'',   fn: ()=>window.print() },
+];
+
+let cmdIdx = 0;
+
+function openCmdPalette() {
+  document.getElementById('cmd-overlay').classList.add('open');
+  document.getElementById('cmd-input').value = '';
+  cmdIdx = 0;
+  renderCmdList('');
+  setTimeout(() => document.getElementById('cmd-input').focus(), 40);
+}
+
+function closeCmdPalette() {
+  document.getElementById('cmd-overlay').classList.remove('open');
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('cmd-overlay')) closeCmdPalette();
+}
+
+function renderCmdList(q) {
+  const filtered = COMMANDS.filter(c =>
+    c.label.toLowerCase().includes(q.toLowerCase()) ||
+    c.group.toLowerCase().includes(q.toLowerCase())
+  );
+  if (!filtered.length) {
+    document.getElementById('cmd-list').innerHTML =
+      `<div class="cmd-empty">No commands match "${q}"</div>`;
+    return;
+  }
+  cmdIdx = 0;
+  let html = '';
+  let lastGroup = '';
+  filtered.forEach((c, i) => {
+    if (c.group !== lastGroup) {
+      html += `<div class="cmd-section">${c.group}</div>`;
+      lastGroup = c.group;
+    }
+    html += `<div class="cmd-item${i===0?' active':''}" data-idx="${i}"
+      onmouseenter="setCmdIdx(${i})"
+      onclick="runCmd(${COMMANDS.indexOf(c)})">
+      <span class="cmd-item-label">${c.label}</span>
+      <span class="cmd-item-key">${c.key}</span>
+    </div>`;
+  });
+  document.getElementById('cmd-list').innerHTML = html;
+}
+
+function setCmdIdx(i) {
+  cmdIdx = i;
+  document.querySelectorAll('.cmd-item').forEach((el,j) => {
+    el.classList.toggle('active', j===i);
+  });
+}
+
+function handleCmdNav(e) {
+  const items = document.querySelectorAll('.cmd-item');
+  if (e.key === 'Escape') { closeCmdPalette(); return; }
+  if (e.key === 'ArrowDown') { cmdIdx = Math.min(cmdIdx+1, items.length-1); setCmdIdx(cmdIdx); return; }
+  if (e.key === 'ArrowUp')   { cmdIdx = Math.max(cmdIdx-1, 0);              setCmdIdx(cmdIdx); return; }
+  if (e.key === 'Enter' && items.length) { items[cmdIdx].click(); }
+}
+
+function runCmd(idx) {
+  closeCmdPalette();
+  COMMANDS[idx].fn();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmdPalette(); return; }
+  switch (e.key.toLowerCase()) {
+    case 't': toggleTheme();       break;
+    case 'r': renderDashboard();   break;
+    case 'd': setMode('demo');     break;
+    case 'l': setMode('live');     break;
+  }
+});
+</script>
+</body>
+</html>

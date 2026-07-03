@@ -1,0 +1,162 @@
+name: CI / Deploy
+
+# ============================================================
+# Пайплайн: lint → тесты → build → деплой на VPS
+#
+# Secrets (добавить в GitHub repo Settings → Secrets):
+#   VPS_HOST        — IP или hostname VPS
+#   VPS_USER        — SSH пользователь (обычно root или botuser)
+#   VPS_SSH_KEY     — приватный SSH ключ (без passphrase)
+#   VPS_DEPLOY_PATH — путь на VPS (напр. /opt/trading)
+# ============================================================
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+
+  # ── 1. Линтинг и тесты ────────────────────────────────────────────────
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ruff lint (fast)
+        run: |
+          pip install ruff==0.6.9
+          ruff check . --select E,F,W --ignore E501
+
+      - name: Run pytest
+        env:
+          # Тесты используют paper trading — реальные ключи не нужны
+          LIVE_TRADING: "false"
+          DRY_RUN: "true"
+          DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+          LOG_LEVEL: "WARNING"
+          KALSHI_API_KEY: "test_key"
+          KALSHI_PRIVATE_KEY_PATH: "./keys/.gitkeep"
+          BINANCE_API_KEY: "test_key"
+          BINANCE_API_SECRET: "test_secret"
+          TELEGRAM_BOT_TOKEN: "0:test"
+          TELEGRAM_ALLOWED_CHAT_ID: "0"
+        run: |
+          pytest tests/ -v --tb=short --cov=core --cov=bots \
+            --cov-report=term-missing --cov-fail-under=60
+
+      - name: Upload coverage
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+          retention-days: 7
+
+  # ── 2. Docker build (без пуша — просто проверяем что собирается) ──────
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build crypto-bot image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.crypto
+          push: false
+          tags: trading/crypto-bot:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build kalshi-bot image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.kalshi
+          push: false
+          tags: trading/kalshi-bot:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3. Деплой на VPS (только при push в main) ─────────────────────────
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: [test, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known_hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy code to VPS
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='keys/' \
+            --exclude='*.db' \
+            --exclude='logs/' \
+            --exclude='__pycache__' \
+            --exclude='.venv' \
+            . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/
+
+      - name: Deploy on VPS
+        env:
+          DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash << 'EOF'
+            set -e
+            cd $DEPLOY_PATH
+
+            echo "==> Pulling latest images / rebuilding..."
+            docker compose build --no-cache
+
+            echo "==> Restarting crypto-bot (rolling)..."
+            docker compose up -d --no-deps crypto-bot
+
+            echo "==> Waiting for health check..."
+            sleep 15
+            docker compose ps crypto-bot
+
+            echo "==> Deploy complete ✅"
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deploy failed — check logs above"
+          # Здесь можно добавить Telegram/Slack уведомление через curl

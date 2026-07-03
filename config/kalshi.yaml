@@ -1,0 +1,28 @@
+# Kalshi Bot — параметры стратегий и риск-лимиты
+# Изменяй здесь, без перезапуска кода (горячая перезагрузка при старте)
+
+risk:
+  daily_loss_limit_pct: 5.0        # % дневного убытка → circuit breaker
+  max_position_size_pct: 10.0      # % капитала в одной позиции
+  max_total_exposure_pct: 50.0     # % капитала в открытых позициях
+
+strategies:
+  momentum:
+    enabled: true
+    confidence_threshold: 0.65     # минимальный скор сигнала
+    max_positions: 3
+    take_profit_pct: 0.15
+    stop_loss_pct: 0.08
+
+  whale_follow:
+    enabled: true
+    min_whale_size: 1000            # минимальный размер ордера для слежки ($)
+    confidence_threshold: 0.70
+    max_positions: 2
+
+markets:
+  categories:                       # торгуем только эти категории маркетов
+    - crypto
+    - economics
+  min_liquidity: 500                # минимальный объём маркета ($)
+  max_time_to_expiry_hours: 72      # не торгуем маркеты с экспирацией > 3 дней
