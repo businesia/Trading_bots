@@ -15,7 +15,8 @@ WORKDIR /app
 
 # Зависимости (кешируются отдельным слоем)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Код проекта
 COPY core/ ./core/
