@@ -307,59 +307,63 @@ class BybitFuturesConnector(ExchangeConnector, PositionDataProvider):
 
     # ── WebSocket ────────────────────────────────────────────────────────
 
-    async def start_ws(self, symbols: list[str], callback) -> None:
-        """Запускает WebSocket для real-time mark price + funding rate."""
+    async def stream_mark_prices(
+        self,
+        symbols: list[str],
+        callback,
+    ) -> None:
+        """
+        Запускает WebSocket стрим mark price + funding rate.
+
+        callback(symbol, mark_price, funding_rate) вызывается при каждом обновлении.
+        """
         import websockets
 
+        self._ws_symbols = symbols
+        self._ws_callback = callback
         self._running = True
-        self._price_callbacks = {s: [] for s in symbols}
-        for s in symbols:
-            self._price_callbacks[s].append(callback)
 
-        self._ws_task = asyncio.create_task(self._ws_loop(symbols))
+        # Bybit v5 public linear stream
+        # Подписываемся на tickers (содержит markPrice и fundingRate)
+        args = [f"tickers.{s}" for s in symbols]
 
-    async def _ws_loop(self, symbols: list[str]) -> None:
-        import websockets
-
-        while self._running:
-            try:
-                async with websockets.connect(self._ws_url) as ws:
-                    self._ws = ws
-                    # Подписка на mark price + funding rate
-                    for symbol in symbols:
+        async def _ws_loop():
+            while self._running:
+                try:
+                    async with websockets.connect(self._ws_url) as ws:
+                        # Подписка
                         await ws.send(json.dumps({
                             "op": "subscribe",
-                            "args": [
-                                f"tickers.{symbol}",
-                            ],
+                            "args": args,
                         }))
+                        logger.info(f"Bybit WS подключен | символы: {symbols}")
 
-                    async for msg in ws:
-                        if not self._running:
-                            break
-                        data = json.loads(msg)
-                        if data.get("topic", "").startswith("tickers."):
-                            await self._handle_ticker(data)
-            except Exception as e:
-                logger.warning(f"Bybit WS ошибка: {e}, переподключение через 5с...")
-                await asyncio.sleep(5)
+                        async for message in ws:
+                            if not self._running:
+                                break
+                            await self._handle_ws_message(json.loads(message))
 
-    async def _handle_ticker(self, data: dict) -> None:
-        """Обрабатывает ticker обновление."""
-        topic = data.get("topic", "")
-        symbol = topic.replace("tickers.", "")
-        if symbol not in self._price_callbacks:
-            return
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Bybit WS ошибка: {e}. Переподключение через 5с...")
+                    await asyncio.sleep(5)
 
-        ticker = data["data"]
-        mark_price = float(ticker["markPrice"])
-        funding_rate = float(ticker.get("fundingRate", 0))
+        self._ws_task = asyncio.create_task(_ws_loop())
 
-        for callback in self._price_callbacks[symbol]:
-            try:
-                await callback(symbol, mark_price, funding_rate)
-            except Exception as e:
-                logger.error(f"WS callback error: {e}")
+    async def _handle_ws_message(self, msg: dict) -> None:
+        """Обрабатывает входящее WS сообщение."""
+        if msg.get("topic", "").startswith("tickers."):
+            data = msg.get("data", {})
+            symbol = data.get("symbol")
+            mark_price = float(data.get("markPrice", 0))
+            funding_rate = float(data.get("fundingRate", 0))
+
+            if self._ws_callback and symbol in self._ws_symbols:
+                try:
+                    await self._ws_callback(symbol, mark_price, funding_rate)
+                except Exception as e:
+                    logger.error(f"Ошибка в WS callback для {symbol}: {e}")
 
     async def stop_ws(self) -> None:
         """Останавливает WebSocket."""
