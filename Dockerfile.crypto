@@ -26,7 +26,7 @@ COPY config/crypto.yaml ./config/
 COPY .env.example ./.env.example
 
 # Директории для данных
-RUN mkdir -p /app/logs /app/keys
+RUN mkdir -p /app/logs /app/keys /app/data && chown -R 1000:1000 /app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

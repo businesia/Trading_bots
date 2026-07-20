@@ -16,6 +16,7 @@ services:
       dockerfile: Dockerfile.crypto
     container_name: crypto_futures_bot
     restart: unless-stopped       # автоподъём при падении
+    user: "1000:1000"             # запускать как botuser (uid 1000)
 
     env_file:
       - .env                      # основные секреты
@@ -52,6 +53,7 @@ services:
       dockerfile: Dockerfile.kalshi
     container_name: kalshi_bot
     restart: unless-stopped
+    user: "1000:1000"             # запускать как botuser (uid 1000)
     profiles:
       - kalshi                    # запускается только с: docker-compose --profile kalshi up
 

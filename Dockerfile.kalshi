@@ -18,7 +18,7 @@ COPY bots/kalshi/ ./bots/kalshi/
 COPY bots/__init__.py ./bots/
 COPY config/kalshi.yaml ./config/
 
-RUN mkdir -p /app/logs /app/keys
+RUN mkdir -p /app/logs /app/keys /app/data && chown -R 1000:1000 /app
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
