@@ -9,6 +9,36 @@
 
 ---
 
+## [v1.0.0] — 2026-07-21 — РАБОЧАЯ ВЕРСИЯ (VDSina + Bybit)
+
+### 🎯 Прорыв
+- **БОТ РАБОТАЕТ В ПРОДАКШНЕ!** (VDSina VPS, Bybit Testnet, Paper Trading)
+- Полностью переключены с Binance на Bybit (недоступен из РФ)
+- Успешно развёрнут на сервере `87.199.199.153` (VDSina, Ubuntu 24.04, 1GB RAM)
+- Бот стабильно работает, Telegram отвечает на команды (/status, /help)
+
+### Добавлено
+- `bots/crypto_futures/connectors/bybit.py` — Async коннектор к Bybit V5 API (REST + WS)
+- `.env.vdsina.test` / `.env.vps.template` — шаблоны продакшн переменных
+- `scripts/setup_vdsina_test.sh` — авто-настройка сервера VDSina (Docker, swap, firewall)
+- `.github/workflows/ci-cd.yml` / `ci.yml` — CI/CD через GitHub Actions (тесты → сборка → деплой)
+- `DEPLOY_GUIDE.md` / `GITHUB_SECRETS_SETUP.md` / `SETUP.md` — документация по развёртыванию
+
+### Изменено
+- `bots/crypto_futures/main.py` — переключён на `BybitFuturesConnector`
+- `config/crypto.yaml` — `exchanges.primary: bybit`
+- `requirements.txt` — совместимые версии пакетов (диапазоны `>=` вместо `==`)
+- `Dockerfile.crypto` / `Dockerfile.kalshi` — `pip install --upgrade pip setuptools wheel`, папка `/app/data`
+- `docker-compose.yml` — добавлен `user: "1000:1000"` для решения проблем с правами SQLite
+
+### Исправлено
+- ✅ Ошибка `numpy==2.5.1` (несуществующая версия) → диапазоны
+- ✅ Ошибка `unable to open database file` → права на `/app/data`
+- ✅ Ошибка `'BybitFuturesConnector' object has no attribute 'stream_mark_prices'` → переименование метода
+- ✅ Аутентификация GitHub (токен вместо пароля)
+
+---
+
 ## [v0.3.0] — 2026-07-04 — Фаза 3: Деплой и мониторинг
 
 ### Добавлено
