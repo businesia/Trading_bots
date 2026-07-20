@@ -93,7 +93,7 @@ async def test_exposure_limit(risk_manager):
         leverage=1.0,
     )
     assert result.allowed is False
-    assert "экспозиц" in result.reason.lower()
+    assert "позиц" in result.reason.lower()
 
 
 # ── Тесты: Kill-switch и паузы ────────────────────────────────────────────

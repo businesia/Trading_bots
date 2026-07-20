@@ -38,5 +38,5 @@ strategies:
     order_size_usd: 50
 
 exchanges:
-  primary: binance
-  backup: bybit                     # резервная, если Binance недоступен
+  primary: bybit
+  backup: binance                     # резервная, если Bybit недоступен

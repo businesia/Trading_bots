@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -100,8 +101,8 @@ class Trade(Base):
 
     # Ценовые параметры
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
-    price: Mapped[float | None] = mapped_column(Float, nullable=True)       # None = market order
-    fill_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)       # None = market order
+    fill_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     fill_quantity: Mapped[float] = mapped_column(Float, default=0.0)
 
     # Комиссии и P&L
@@ -119,14 +120,14 @@ class Trade(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
-    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    filled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    filled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
 
     # Метаданные (JSON как текст)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_trades_bot_symbol", "bot", "symbol"),
@@ -159,12 +160,12 @@ class Position(Base):
     # Размер и цены
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
-    current_price: Mapped[float | None] = mapped_column(Float, nullable=True)
-    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    current_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    exit_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Риск
-    stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
-    take_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stop_loss: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    take_profit: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     leverage: Mapped[float] = mapped_column(Float, default=1.0)
 
     # P&L
@@ -182,12 +183,12 @@ class Position(Base):
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
 
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_positions_bot_status", "bot", "status"),

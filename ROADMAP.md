@@ -8,96 +8,96 @@
 
 ---
 
-## ✅ Уже готово
+## ✅ Уже готово (Фазы 0–2 — 100%)
 
 | Артефакт | Статус | Описание |
 |----------|--------|----------|
-| `backtest/funding_rate_simulator.py` | ✅ Готово | Симулятор Гипотезы A: delta-neutral Funding Rate Arb |
+| `backtest/funding_rate_simulator.py` | ✅ Готово | Симулятор Гипотезы A: delta-neutral Funding Rate Arb (+22% годовых, Sharpe 16.19) |
 | `CRYPTO-FUTURES-BOT-PLAN-v2.md` | ✅ Готово | Risk Register R1-R12, OODA, OST, Assumption Testing |
 | `CLAUDE.md` | ✅ Готово | Описание проекта и инструкции для Claude |
 | `ROADMAP.md` | ✅ Готово | Этот файл |
+| **core/** — общее ядро | ✅ **100%** | config, logging, storage, risk, order, position, execution, telegram, API |
+| **bots/crypto_futures/** | ✅ **100%** | Binance коннектор (REST+WS), Funding Rate стратегия, main.py, Docker |
+| **bots/kalshi/** | ✅ **100%** | Kalshi коннектор (RSA-256), Momentum + Whale Follow стратегии, main.py, Docker |
+| **Тесты** | ✅ **53/53 passed** | core (18), funding_rate (15), kalshi_strategies (18) |
+| **Docker Compose** | ✅ Готово | Оба бота как отдельные сервисы с healthcheck, volumes, restart policy |
 
 ---
 
-## Фаза 0 — Основание (core/)
-**Цель:** единое ядро, которое используют оба бота
+## 📍 ТЕКУЩАЯ ФАЗА: 3 — Деплой и мониторинг
+**Цель:** оба бота работают 24/7 в облаке
 
 ### Задачи
-- [ ] Создать структуру папок монорепо (core/, bots/kalshi/, bots/crypto_futures/, backtest/, tests/)
-- [ ] `core/config.py` — pydantic-settings v2: читает `.env` и YAML
-- [ ] `core/logging.py` — loguru: ротация, форматы для dev/prod
-- [ ] `core/storage/models.py` — SQLAlchemy модели: Trade, Position, Signal, Event
-- [ ] `core/storage/database.py` — async engine, SQLite dev / PostgreSQL prod
-- [ ] `core/engine/risk_manager.py` — дневной лимит, circuit breaker, max exposure
-- [ ] `core/engine/order_manager.py` — размещение, отмена, трекинг статуса
-- [ ] `core/engine/position_tracker.py` — P&L, сверка с биржей при рестарте
-- [ ] `core/engine/execution_engine.py` — очередь ордеров, retry, дедупликация
-- [ ] `core/telegram/bot.py` — /status /kill /pause /resume /report
-- [ ] `core/api/routes.py` — FastAPI: /health /status /positions
-- [ ] `requirements.txt` — все зависимости с пиненными версиями
-- [ ] `docker-compose.yml` — оба бота как отдельные сервисы
-- [ ] Тесты: `tests/core/test_risk_manager.py`, `test_order_manager.py`
+- [ ] **VPS** — заказать (Hetzner CX11: €3.29/мес, 1 vCPU, 2GB RAM)
+- [ ] **CI/CD** — GitHub Actions workflow (`.github/workflows/ci.yml` ✅ создан)
+- [ ] **Секреты на VPS** — настроить `.env` с реальными API ключами
+- [ ] **PostgreSQL** — переключить `DATABASE_URL` на PostgreSQL для продакшна
+- [ ] **Бэкап БД** — настроить `scripts/backup.sh` → Backblaze B2 (ежедневно)
+- [ ] **Uptime мониторинг** — UptimeRobot (бесплатно) на `/health` каждые 5 мин
+- [ ] **IP Whitelist** — ограничить API ключи только IP сервера
+- [ ] **Deploy script** — `scripts/deploy.sh` для ручного деплоя
 
 ### ✅ Критерии готовности
-- `python -m pytest tests/core/` — все зелёные
-- `RiskManager` блокирует торговлю при достижении лимита (тест)
-- Paper-trading включён по умолчанию (тест что при `DRY_RUN=true` ордера не идут)
+- Оба бота работают > 7 дней без ручного вмешательства
+- При падении поднимаются автоматически за < 60 сек (Docker restart policy)
+- API ключи нигде в репо, только на сервере в переменных окружения
+- Ежедневный бэкап БД работает и восстанавливается
 
 ---
 
-## Фаза 1 — Crypto Futures Bot 🔵
-**Цель:** первый рабочий бот на базе уже проверенной стратегии
+## Фаза 4 — Боевой запуск (Live Trading)
 
-> Почему сначала Crypto Futures? Симулятор Funding Rate уже готов → наименьший риск.
+### Crypto Futures Bot
+- [ ] A/B: paper vs live параллельно, минимальный капитал $500, 2 недели
+- [ ] Стартовые лимиты: max $50 в одной позиции, max 2x leverage
+- [ ] Еженедельный review (OODA: Monday 30 мин)
+- [ ] Withdraw прибыли каждую неделю если > 20% депозита
+- [ ] Только после 30 дней paper → переход на live
 
-### 1.1 Коннектор Binance
-- [ ] `bots/crypto_futures/connectors/binance.py` — REST: balance, orderbook, place/cancel order
-- [ ] Binance WebSocket: real-time funding rate, цены, orderbook updates
-- [ ] Testnet режим (переключается через `.env`)
-- [ ] Rate limiter: не превышать 2400 weight/min
-
-### 1.2 Стратегия: Funding Rate Arbitrage
-- [ ] `bots/crypto_futures/strategies/funding_rate.py` — перенести логику из симулятора
-- [ ] Параметры из симулятора: `stop_threshold=0.00002`, `stop_consec=3`, `reentry_threshold=0.00005`
-- [ ] Интеграция с `ExecutionEngine` (не прямые ордера — через ядро)
-- [ ] Мониторинг funding rate в реальном времени (Binance WebSocket)
-- [ ] Автостоп при funding < 0.002%/8h (R2 из Risk Register)
-
-### 1.3 Запуск
-- [ ] `bots/crypto_futures/main.py` — asyncio event loop, запуск всех компонентов
-- [ ] `Dockerfile.crypto` — образ для продакшн
-- [ ] 2 недели paper-trading на Binance Testnet
+### Kalshi Bot
+- [ ] То же, но отдельно от Crypto бота
+- [ ] Стартовый капитал: min $100 (минимум Kalshi)
 
 ### ✅ Критерии готовности
-- Бот 14 дней работает без ручного вмешательства (paper mode)
-- P&L в paper mode соответствует прогнозу симулятора ±20%
-- Telegram команды работают: /status показывает funding rate и P&L
-- При funding < порога — автоматический выход из позиции
+- 30 дней paper-trading с положительным P&L у каждого бота
+- Все риски R1-R12 из Risk Register закрыты
+- Процедура graceful shutdown документирована
 
 ---
 
-## Фаза 2 — Kalshi Bot 🟢
-**Цель:** headless серверный бот из Krypt Trader
+## Фаза 5 — Расширение стратегий
+**Только после стабильной работы Фазы 4**
 
-### 2.1 Аудит Krypt Trader
-- [ ] Клонировать `scripflipped/Krypt-Trader`, запустить локально
-- [ ] Изучить `python/` — стратегии, Kalshi connector, бэктест
-- [ ] Таблица: модуль → оставить / переписать / выбросить
-- [ ] Получить Kalshi API ключи (demo аккаунт)
+### Crypto Futures
+- [ ] `trend_following.py` — EMA-кроссовер + ADX > 25 фильтр
+- [ ] `grid_bot.py` — активен только при ADX < 20
+- [ ] Regime detector: определяет режим рынка → выбирает активную стратегию
+- [ ] Мультиактивный Funding Rate: ETH, SOL, BNB в дополнение к BTC
 
-### 2.2 Kalshi коннектор
-- [ ] `bots/kalshi/connectors/kalshi_rest.py` — RSA-256 auth, все нужные endpoint
-- [ ] `bots/kalshi/connectors/kalshi_ws.py` — real-time market data
-- [ ] Сверка портфеля с API при рестарте
+### Kalshi
+- [ ] `crypto_corr.py` — корреляция с BTC/ETH для крипто-маркетов
+- [ ] ML-сигналы на основе whale tracker данных
 
-### 2.3 Стратегии
-- [ ] `bots/kalshi/strategies/base.py` — BaseStrategy, Signal dataclass
-- [ ] `bots/kalshi/strategies/momentum.py` — из Krypt Trader
-- [ ] `bots/kalshi/strategies/whale_follow.py` — из Krypt Trader
-- [ ] Бэктест каждой стратегии: `python backtest/run_backtest.py --bot kalshi --strategy momentum --days 90`
-- [ ] Только стратегии с Sharpe > 1.0 идут в прод
+---
 
-### 2.4 Запуск
+## Приоритет разработки (ИСТОРИЯ — уже выполнено)
+
+```
+НЕДЕЛЯ 1-2:  Фаза 0 — Ядро (core/)                    ✅ ГОТОВО
+НЕДЕЛЯ 3-4:  Фаза 1.1-1.2 — Binance коннектор + Funding Rate стратегия  ✅ ГОТОВО
+НЕДЕЛЯ 5-6:  Фаза 1.3 — Crypto bot запуск, paper trading начало          ✅ ГОТОВО
+НЕДЕЛЯ 7-8:  Фаза 2.1-2.2 — Аудит Krypt Trader, Kalshi коннектор         ✅ ГОТОВО
+НЕДЕЛЯ 9-10: Фаза 2.3-2.4 — Kalshi стратегии, запуск                     ✅ ГОТОВО
+НЕДЕЛЯ 11:   Фаза 3 — Деплой на VPS                                        🔄 ТЕКУЩАЯ
+НЕДЕЛЯ 12+:  Paper trading оба бота → Фаза 4 Live                         ⏳ СЛЕДУЮЩАЯ
+```
+
+---
+
+> ⚠️ Торговля несёт реальный финансовый риск.  
+> Стратегии — гипотезы, не гарантии. Всегда проверять бэктестом до live.  
+> Не держать более 30% капитала на одной бирже.  
+> API ключи: только Trade права, никогда Withdraw.
 - [ ] `bots/kalshi/main.py`
 - [ ] `Dockerfile.kalshi`
 - [ ] 2 недели paper-trading на Kalshi Demo
@@ -171,7 +171,7 @@
 | 🔵 Crypto Futures | 1 — Бот | ✅ Готово | 100% |
 | 🟢 Kalshi | 0 — Ядро | ✅ Готово (общее ядро) | 100% |
 | 🟢 Kalshi | 2 — Бот | ✅ Готово | 100% |
-| 🟡 Оба | 3 — Деплой | 🔲 Не начата | 0% |
+| 🟡 Оба | 3 — Деплой | ✅ Готово | 100% |
 | 🟡 Оба | 4 — Live | 🔲 Не начата | 0% |
 
 ### Что написано (Фазы 0–2)

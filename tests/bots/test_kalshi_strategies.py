@@ -7,6 +7,7 @@ tests/bots/test_kalshi_strategies.py
 from __future__ import annotations
 
 import pytest
+from collections import deque
 from datetime import datetime, timezone, timedelta
 
 from bots.kalshi.strategies.base import KalshiSide, KalshiAction, KalshiSignal, KalshiCloseSignal
@@ -199,7 +200,7 @@ class TestMomentumStrategy:
     def test_no_price_in_forbidden_range(self, momentum):
         """yes_price < min_yes_price → фильтрация в _check_entry."""
         result = momentum._check_entry(
-            state=MarketState(ticker=TICKER),
+            state=MarketState(ticker=TICKER, volume_history=deque([1000], maxlen=10)),
             yes_price=10,   # < min_yes_price=15
             volume=1000,
             market_data={"close_time": future_close_time()},

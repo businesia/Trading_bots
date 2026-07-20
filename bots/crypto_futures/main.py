@@ -22,7 +22,7 @@ from loguru import logger
 # Добавляем корень проекта в PYTHONPATH
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from bots.crypto_futures.connectors.binance import BinanceFuturesConnector
+from bots.crypto_futures.connectors.bybit import BybitFuturesConnector
 from bots.crypto_futures.strategies.funding_rate import FundingRateStrategy
 from core.api.routes import init_api, router
 from core.config import load_bot_config, settings
@@ -48,7 +48,7 @@ class CryptoFuturesBot:
 
     def __init__(self) -> None:
         # Компоненты инициализируются в start()
-        self._connector: BinanceFuturesConnector | None = None
+        self._connector: BybitFuturesConnector | None = None
         self._risk_manager: RiskManager | None = None
         self._order_manager: OrderManager | None = None
         self._position_tracker: PositionTracker | None = None
@@ -68,7 +68,7 @@ class CryptoFuturesBot:
         logger.info("=" * 60)
         logger.info("  CRYPTO FUTURES BOT — СТАРТ")
         logger.info(f"  Режим: {'📄 PAPER TRADING' if settings.is_paper_trading else '💰 LIVE TRADING'}")
-        logger.info(f"  Binance: {'testnet' if settings.binance_testnet else 'mainnet'}")
+        logger.info(f"  Bybit: {'testnet' if settings.bybit_testnet else 'mainnet'}")
         logger.info("=" * 60)
 
         # ── 2. Конфиг стратегий ────────────────────────────────────────────
@@ -84,22 +84,26 @@ class CryptoFuturesBot:
         # ── 3. База данных ─────────────────────────────────────────────────
         await init_db(settings.database_url)
 
-        # ── 4. Binance коннектор ───────────────────────────────────────────
-        self._connector = BinanceFuturesConnector(
-            api_key=settings.binance_api_key,
-            api_secret=settings.binance_api_secret,
-            testnet=settings.binance_testnet,
+        # ── 4. Bybit коннектор ───────────────────────────────────────────
+        self._connector = BybitFuturesConnector(
+            api_key=settings.bybit_api_key,
+            api_secret=settings.bybit_api_secret,
+            testnet=settings.bybit_testnet,
         )
         await self._connector.__aenter__()
 
-        # Получаем стартовый капитал
-        try:
-            balances = await self._connector.get_balance()
-            capital = balances.get("USDT", 10_000.0)
-            logger.info(f"Баланс Binance: USDT={capital:,.2f}")
-        except Exception as e:
-            logger.warning(f"Не удалось получить баланс: {e}. Используем дефолтный $10,000")
+        # Получаем стартовый капитал (только в live режиме)
+        if not settings.is_paper_trading:
+            try:
+                balances = await self._connector.get_balance()
+                capital = balances.get("USDT", 10_000.0)
+                logger.info(f"Баланс Bybit: USDT={capital:,.2f}")
+            except Exception as e:
+                logger.warning(f"Не удалось получить баланс: {e}. Используем дефолтный $10,000")
+                capital = 10_000.0
+        else:
             capital = 10_000.0
+            logger.info(f"Paper trading режим: используем дефолтный капитал ${capital:,.0f}")
 
         # ── 5. Риск-менеджер ───────────────────────────────────────────────
         self._risk_manager = RiskManager(
@@ -158,9 +162,14 @@ class CryptoFuturesBot:
             await self._telegram.start()
 
         # ── 11. Обработчики сигналов ОС ────────────────────────────────────
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        # На Windows add_signal_handler не поддерживается, используем try/except
+        try:
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        except NotImplementedError:
+            # Windows — сигналы обрабатываются через KeyboardInterrupt
+            pass
 
         self._is_running = True
         logger.info("✅ Crypto Futures Bot запущен")
@@ -217,6 +226,9 @@ class CryptoFuturesBot:
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
             logger.info("Главный цикл отменён — завершаем")
+        except Exception as e:
+            logger.error(f"Ошибка в главном цикле: {e}", exc_info=True)
+            raise
         finally:
             for task in tasks:
                 task.cancel()
@@ -368,10 +380,23 @@ async def main() -> None:
     except KeyboardInterrupt:
         await bot.stop()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"\nException type: {type(e).__name__}")
+        print(f"Exception args: {e.args}")
+        print(f"Exception str: {str(e)}")
         logger.critical(f"Критическая ошибка: {e}", exc_info=True)
         await bot.stop()
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import traceback
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        traceback.print_exc()
+        print(f"\nException type: {type(e).__name__}")
+        print(f"Exception args: {e.args}")
+        print(f"Exception str: {str(e)}")
+        sys.exit(1)
